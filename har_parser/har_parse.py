@@ -16,24 +16,44 @@ import json
 from haralyzer import HarParser, HarPage
 from scipy import integrate
 
+# Handle too many or not enough inputs
+if len(sys.argv) < 2:
+    raise Exception("Error: need a path to HAR file as command-line argument")
+elif len(sys.argv) > 2:
+    raise Exception("Error: gave too many command-line arguments")
+
 # Get HAR archive File name (as command-line argument)
 har = sys.argv[1]
 with open(har, 'r') as f:
     har_parser = HarParser(json.loads(f.read()))
 
+# Get onLoad per page load
+page_onLoad = []
+for item in har_parser.har_data["pages"]:
+    page_onLoad.append(item.get("pageTimings").get("onLoad"))
+
 # Get total in bytes for _bytesIn and _objectSize
-total_bytesIn = total_objectSize = byteCount = objectCount = 0
+numPages = 0
+total_bytesIn = []
+total_objectSize = []
 for page in har_parser.pages:
+    numPages += 1
+    byteSize = objSize = 0
     for entry in page.entries:
-        if (entry["_bytesIn"] >= 0):
-            total_bytesIn += entry["_bytesIn"]
-            byteCount += 1
-        if (entry["_objectSize"] >= 0):
-            total_objectSize += entry["_objectSize"]
-            objectCount += 1
-print("IN BYTES:")
-print("Total bytes retrieved: " + str(total_bytesIn) + ", Count: " + str(byteCount))
-print("Total objects retrieved: " + str(total_objectSize) + ", Count: " + str(objectCount))
+        byteSize += entry["_bytesIn"]
+        objSize += entry["_objectSize"]
+    total_bytesIn.append(byteSize)
+    total_objectSize.append(objSize)
+
+print(str(numPages) + " Page Loads\n")
+print("IN BYTES (per page load):")
+print("Total bytes retrieved: " + str(total_bytesIn))
+print("Total objects retrieved: " + str(total_objectSize))
 print()
+
+# Check that there are the same number _bytesIn values and _objectSize values for each page load
+for i, n in enumerate(total_bytesIn):
+    if n != total_objectSize[i]:
+        raise Exception("Unequal totals between _bytesIn and _objectSize for an index!")
 
 # Calculate percentages of bytes retrived / objects retrieved, respetively, as a function of time (from 0 to onLoad)
