@@ -15,6 +15,8 @@ import sys
 import json
 from haralyzer import HarParser, HarPage
 from scipy import integrate
+import pandas as pd
+import asciiplotlib as apl
 
 # Handle too many or not enough inputs
 if len(sys.argv) < 2:
@@ -40,20 +42,101 @@ for page in har_parser.pages:
     numPages += 1
     byteSize = objSize = 0
     for entry in page.entries:
-        byteSize += entry["_bytesIn"]
-        objSize += entry["_objectSize"]
+        byteSize += int(entry["_bytesIn"])
+        objSize += int(entry["_objectSize"])
     total_bytesIn.append(byteSize)
     total_objectSize.append(objSize)
 
-print(str(numPages) + " Page Loads\n")
+if numPages == 1:
+    print(str(numPages) + " Page Load\n")
+else:
+    print(str(numPages) + " Page Loads\n")
 print("IN BYTES (per page load):")
 print("Total bytes retrieved: " + str(total_bytesIn))
 print("Total objects retrieved: " + str(total_objectSize))
 print()
 
-# Check that there are the same number _bytesIn values and _objectSize values for each page load
-for i, n in enumerate(total_bytesIn):
-    if n != total_objectSize[i]:
-        raise Exception("Unequal totals between _bytesIn and _objectSize for an index!")
+# Get raw values for time, bytes, objects until onLoad endpoint
+time_to_onload = []
+bytes_to_onload = []
+objects_to_onload = []
+pageCount = 0
+for page in har_parser.pages:
+    l1 = []
+    l2 = []
+    l3 = []
+    for entry in page.entries:
+        l1.append(entry["time"])
+        l2.append(int(entry["_bytesIn"]))
+        l3.append(int(entry["_objectSize"]))
+    time_to_onload.append(l1)
+    bytes_to_onload.append(l2)
+    objects_to_onload.append(l3)
 
-# Calculate percentages of bytes retrived / objects retrieved, respetively, as a function of time (from 0 to onLoad)
+# Check that all page loads have the same number of time, _bytesIn, and _objectSize information
+for i in range(len(time_to_onload)):
+    if len(time_to_onload[i]) != len(bytes_to_onload[i]):
+        raise Exception("Error: time_to_onload != bytes_to_onload for index " + str(i))
+    if len(time_to_onload[i]) != len(objects_to_onload[i]):
+        raise Exception("Error: time_to_onload != objects_to_onload for index " + str(i))
+    if len(bytes_to_onload[i]) != len(objects_to_onload[i]):
+        raise Exception("Error: bytes_to_onload != objects_to_onload for index " + str(i))
+
+# Calculate percentages of bytes and objects retrieved with respect to time (from 0 to onLoad)
+bytes_to_onload_percentages = []
+objects_to_onload_percentages = []
+for i in range(len(total_bytesIn)):
+    l1 = []
+    l2 = []
+    for j in range(0, len(time_to_onload[i])):
+        l1.append(bytes_to_onload[i][j] / total_bytesIn[i])
+        l2.append(objects_to_onload[i][j] / total_objectSize[i])
+    bytes_to_onload_percentages.append(l1)
+    objects_to_onload_percentages.append(l2)
+del l1; del l2; del l3 # From before
+
+# Takes in a list and returns aggregate, i.e. each item of list becomes value of that item added with all item before it
+def get_aggregate(l):
+    for i in range(len(l)):
+        for j in range(i):
+            l[i] += l[j]
+    return l
+
+# Make list of dataframes based on page load index and sort them by time
+page_load_df_list = [] # List of dataframes for each web page load from HAR archive file
+for i in range(len(time_to_onload)):
+    # Reassignment to create new dataframes
+    tmp_dat = {"time_to_onload":time_to_onload[i], "raw_bytes":bytes_to_onload[i], "percent_bytes":bytes_to_onload_percentages[i],
+               "raw_objects":objects_to_onload[i], "percent_objects":objects_to_onload_percentages[i]}
+    tmp_df = pd.DataFrame(tmp_dat, columns=["time_to_onload", "raw_bytes", "percent_bytes", "raw_objects", "percent_objects"])
+    # Sort by time
+    tmp_df = tmp_df.sort_values(by = ["time_to_onload"])
+    page_load_df_list.append(tmp_df)
+del tmp_dat; del tmp_df
+
+# Percentage accumulation over time
+for i in range(len(page_load_df_list)):
+    # Percent bytes
+    tmp_percent_bytes = page_load_df_list[i]["percent_bytes"]
+    n = page_load_df_list[i].columns[2]
+    page_load_df_list[i].drop(n, axis = 1, inplace = True)
+    page_load_df_list[i][n] = get_aggregate(tmp_percent_bytes.copy())
+
+    # Percent objects
+    tmp_percent_objects = page_load_df_list[i]["percent_objects"]
+    n = page_load_df_list[i].columns[4]
+    page_load_df_list[i].drop(n, axis = 1, inplace = True)
+    page_load_df_list[i][n] = get_aggregate(tmp_percent_objects.copy())
+# Clear variables
+del tmp_percent_bytes; del tmp_percent_objects; del n
+
+# Plot general relationships
+print("RELATIONSHIP VISUALIZATIONS (for page load 1 only):\n")
+print(" Time vs. Percentage of bytes retrieved at time t")
+fig = apl.figure()
+fig.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_bytes"])
+fig.show()
+
+# import matplotlib.pyplot as plt
+# plt.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_bytes"])
+# plt.show()
