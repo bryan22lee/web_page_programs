@@ -140,7 +140,7 @@ else:
     print("RELATIONSHIP VISUALIZATIONS:\n")
 
 # Percent bytes vs. time
-print(" Percentage of bytes retrievedvs. Time")
+print(" Percentage of bytes retrieved vs. Time")
 fig = apl.figure()
 fig.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_bytes"])
 fig.show()
