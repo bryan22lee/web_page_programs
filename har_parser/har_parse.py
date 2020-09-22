@@ -14,7 +14,7 @@
 import sys
 import json
 from haralyzer import HarParser, HarPage
-from scipy import integrate
+from numpy import trapz
 import pandas as pd
 import asciiplotlib as apl
 # import matplotlib.pyplot as plt
@@ -157,3 +157,49 @@ fig.show()
 # plt.show()
 
 # Function fitting (regression)
+print("\n\n(Integration with the composite trapezoidal rule)\n")
+# Compute (1 - x(t)) for both percenty_bytes and percent_objects for each web page load
+integrate_df_list = []
+for i in page_load_df_list:
+    integrate_percent_bytes = []
+    integrate_percent_objects = []
+    for j, k in zip(i["percent_bytes"], i["percent_objects"]):
+        integrate_percent_bytes.append(1 - j)
+        integrate_percent_objects.append(1 - k)
+    # Create dataframe
+    integrate_dat = {"time":i["time_to_onload"], "integrate_percent_bytes":integrate_percent_bytes, "integrate_percent_objects":integrate_percent_objects}
+    integrate_df = pd.DataFrame(integrate_dat, columns=["time", "integrate_percent_bytes", "integrate_percent_objects"])
+    integrate_df_list.append(integrate_df)
+
+# Compute and print onLoad, byteIndex, and objectIndex for each web page load
+print("RESULTS (onLoad, byteIndex, objectIndex) per each web page load:\n")
+
+# Compute byteIndex & objectIndex
+list_byteIndex = []
+list_objectIndex = []
+for i in range(len(integrate_df_list)):
+    # Get relevant lists for integration
+    y1 = list(integrate_df_list[i]["integrate_percent_bytes"])
+    y2 = list(integrate_df_list[i]["integrate_percent_objects"])
+    x = list(integrate_df_list[i]["time"])
+
+    # Set integration endpoint to onLoad such that the integral is bounded by [0, onLoad]
+    for j in range(len(x)):
+        if x[j] > page_onLoad[i]:
+            # Trim the lists to the onLoad endpoint
+            del x[j:]; del y1[j:]; del y2[j:]
+            break
+
+    # byteIndex
+    # Integration using trapezoidal rule
+    list_byteIndex.append(trapz(y1, x=x))
+
+    # objectIndex
+    # Integration using trapezoidal rule
+    list_objectIndex.append(trapz(y2, x=x))
+# Delete variables from memory
+del x; del y1; del y2
+
+# Print results
+for i in range(len(page_onLoad)):
+    print(" Page Load " + str(i + 1) + ": (" + str(page_onLoad[i]) + ", " + str(list_byteIndex[i]) + ", " + str(list_objectIndex[i]) + ")")
