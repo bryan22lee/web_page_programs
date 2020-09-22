@@ -17,6 +17,7 @@ from haralyzer import HarParser, HarPage
 from scipy import integrate
 import pandas as pd
 import asciiplotlib as apl
+# import matplotlib.pyplot as plt
 
 # Handle too many or not enough inputs
 if len(sys.argv) < 2:
@@ -97,9 +98,11 @@ del l1; del l2; del l3 # From before
 
 # Takes in a list and returns aggregate, i.e. each item of list becomes value of that item added with all item before it
 def get_aggregate(l):
+    cpy = l.copy()
     for i in range(len(l)):
         for j in range(i):
-            l[i] += l[j]
+            l[i] += cpy[j]
+    del cpy
     return l
 
 # Make list of dataframes based on page load index and sort them by time
@@ -117,26 +120,36 @@ del tmp_dat; del tmp_df
 # Percentage accumulation over time
 for i in range(len(page_load_df_list)):
     # Percent bytes
-    tmp_percent_bytes = page_load_df_list[i]["percent_bytes"]
-    n = page_load_df_list[i].columns[2]
-    page_load_df_list[i].drop(n, axis = 1, inplace = True)
-    page_load_df_list[i][n] = get_aggregate(tmp_percent_bytes.copy())
+    tmp_list_a = []
+    for a in page_load_df_list[i]["percent_bytes"]:
+        tmp_list_a.append(a)
+    page_load_df_list[i]["percent_bytes"] = get_aggregate(tmp_list_a.copy())
 
     # Percent objects
-    tmp_percent_objects = page_load_df_list[i]["percent_objects"]
-    n = page_load_df_list[i].columns[4]
-    page_load_df_list[i].drop(n, axis = 1, inplace = True)
-    page_load_df_list[i][n] = get_aggregate(tmp_percent_objects.copy())
-# Clear variables
-del tmp_percent_bytes; del tmp_percent_objects; del n
+    tmp_list_b = []
+    for b in page_load_df_list[i]["percent_objects"]:
+        tmp_list_b.append(b)
+    page_load_df_list[i]["percent_objects"] = get_aggregate(tmp_list_b.copy())
+# Delete variables from memory
+del tmp_list_a; del tmp_list_b
 
 # Plot general relationships
 print("RELATIONSHIP VISUALIZATIONS (for page load 1 only):\n")
-print(" Time vs. Percentage of bytes retrieved at time t")
+# Percent bytes vs. time
+print(" Percentage of bytes retrieved at time t vs. Time")
 fig = apl.figure()
 fig.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_bytes"])
 fig.show()
+# Percentage objects vs. time
+print("\n Percentage of objects retrieved at time t vs. Time")
+fig = apl.figure()
+fig.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_objects"])
+fig.show()
 
-# import matplotlib.pyplot as plt
+# matplotlib.pyplot visualizations
 # plt.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_bytes"])
 # plt.show()
+# plt.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_objects"])
+# plt.show()
+
+# Function fitting (regression)
