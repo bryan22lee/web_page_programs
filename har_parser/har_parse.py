@@ -134,14 +134,18 @@ for i in range(len(page_load_df_list)):
 del tmp_list_a; del tmp_list_b
 
 # Plot general relationships
-print("RELATIONSHIP VISUALIZATIONS (for page load 1 only):\n")
+if numPages != 1:
+    print("RELATIONSHIP VISUALIZATIONS (for page load 1 only):\n")
+else:
+    print("RELATIONSHIP VISUALIZATIONS:\n")
+
 # Percent bytes vs. time
-print(" Percentage of bytes retrieved at time t vs. Time")
+print(" Percentage of bytes retrievedvs. Time")
 fig = apl.figure()
 fig.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_bytes"])
 fig.show()
 # Percentage objects vs. time
-print("\n Percentage of objects retrieved at time t vs. Time")
+print("\n Percentage of objects retrieved vs. Time")
 fig = apl.figure()
 fig.plot(page_load_df_list[0]["time_to_onload"], page_load_df_list[0]["percent_objects"])
 fig.show()
